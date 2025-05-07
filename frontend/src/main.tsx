@@ -8,7 +8,7 @@ import App from "./App.tsx";
 createRoot(document.getElementById("root")!).render(
     <StrictMode>
         <BrowserRouter>
-            <ThemeProvider defaultTheme="dark" storageKey="maestro-theme">
+            <ThemeProvider defaultTheme="system" storageKey="maestro-theme">
                 <App />
             </ThemeProvider>
         </BrowserRouter>
