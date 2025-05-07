@@ -1,6 +1,6 @@
 import { toast } from "sonner"
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+const API_URL = `${import.meta.env.VITE_API_URL}/api` || "http://localhost:8000"
 
 interface ApiOptions {
   method?: string
