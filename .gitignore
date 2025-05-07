@@ -1,0 +1,68 @@
+# === Python / Django ===
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.pot
+*.py[cod]
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.idea/
+.vscode/
+*.swp
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+local_settings.py
+.DS_Store
+
+# Django static/media files
+/staticfiles/
+/media/
+
+# Django migrations (optional, if you want to ignore them)
+**/migrations/*.py
+!**/migrations/__init__.py
+
+# === Node / React / Vite ===
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+*.tsbuildinfo
+
+# Vite env files
+.env.local
+.env.*.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+
+# === Tailwind (no specific files unless using custom caches) ===
+
+# === Supabase ===
+.supabase/
+.supabase/functions/node_modules/
+.supabase/temp/
+supabase/.env
+
+# === Logs and OS files ===
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
+.env
