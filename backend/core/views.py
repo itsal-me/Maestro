@@ -4,7 +4,7 @@ from rest_framework import status
 from django.shortcuts import redirect
 from django.conf import settings
 from .services import SpotifyService, AIService
-from .models import User, UserAnalysis, GeneratedPlaylist
+from .models import UserProfile, UserAnalysis, GeneratedPlaylist
 from .serializers import UserAnalysisSerializer, GeneratedPlaylistSerializer
 import datetime
 import json
@@ -28,7 +28,7 @@ class SpotifyCallbackView(APIView):
             spotify_user = sp_data['user']
             
             # Create or update user in database
-            user, created = User.objects.get_or_create(
+            user, created = UserProfile.objects.get_or_create(
                 spotify_id=spotify_user['id'],
                 defaults={
                     'username': spotify_user.get('display_name', spotify_user['id']),
@@ -60,7 +60,7 @@ class AnalyzeUserView(APIView):
             return Response({'error': 'User ID not provided'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            user = User.objects.get(id=user_id)
+            user = UserProfile.objects.get(id=user_id)
             sp_data = SpotifyService.get_user_data(user.access_token)
             
             # Get AI analysis
@@ -77,7 +77,7 @@ class AnalyzeUserView(APIView):
             serializer = UserAnalysisSerializer(analysis)
             return Response(serializer.data)
         
-        except User.DoesNotExist:
+        except UserProfile.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -92,7 +92,7 @@ class GeneratePlaylistView(APIView):
             return Response({'error': 'User ID not provided'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            user = User.objects.get(id=user_id)
+            user = UserProfile.objects.get(id=user_id)
             sp_data = SpotifyService.get_user_data(user.access_token)
             
             # Get playlist from AI
@@ -121,7 +121,7 @@ class GeneratePlaylistView(APIView):
             serializer = GeneratedPlaylistSerializer(generated_playlist)
             return Response(serializer.data)
         
-        except User.DoesNotExist:
+        except UserProfile.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
