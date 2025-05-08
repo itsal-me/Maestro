@@ -43,6 +43,9 @@ export const api = {
   // Auth endpoints
   getSpotifyAuthUrl: () => apiRequest<{ auth_url: string }>("/auth/spotify/"),
 
+  // User endpoints
+  getUserProfile: (userId: number) => apiRequest<any>(`/users/${userId}/profile/`),
+
   // User analysis endpoints
   analyzeUser: (userId: number) =>
     apiRequest<any>("/analyze/", {

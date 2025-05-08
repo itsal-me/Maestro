@@ -76,6 +76,28 @@ class SpotifyCallbackView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class UserProfileView(APIView):
+    def get(self, request, user_id):
+        try:
+            #return spotify user data from spotifyservice.get_user_data
+            user_profile = UserProfile.objects.get(id=user_id)
+            sp_data = SpotifyService.get_user_data(user_profile.access_token)
+            user_data = {
+                'spotify_id': user_profile.spotify_id,
+                'display_name': sp_data['user'].get('display_name', ''),
+                'country': sp_data['user'].get('country', ''),
+                'top_tracks': sp_data['top_tracks'],
+                'top_artists': sp_data['top_artists'],
+                'recently_played': sp_data['recently_played'],
+                'saved_tracks': sp_data['saved_tracks']
+            }
+            return Response(user_data)
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+
 class AnalyzeUserView(APIView):
     def post(self, request):
         user_id = request.data.get('user_id')
