@@ -13,7 +13,7 @@ class SpotifyService:
             client_id=settings.SPOTIFY_CLIENT_ID,
             client_secret=settings.SPOTIFY_CLIENT_SECRET,
             redirect_uri=settings.SPOTIFY_REDIRECT_URI,
-            scope='user-library-read user-top-read playlist-modify-public playlist-modify-private'
+            scope='user-library-read user-top-read playlist-modify-public playlist-modify-private user-read-recently-played'
         )
         return auth_manager.get_authorize_url()
 
