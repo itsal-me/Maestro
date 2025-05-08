@@ -12,7 +12,7 @@ class UserProfile(models.Model):
         db_table = 'users'
 
 class UserAnalysis(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE) 
     personality_type = models.CharField(max_length=255)
     music_analytics = models.JSONField()
     generated_at = models.DateTimeField(auto_now_add=True)
@@ -21,7 +21,7 @@ class UserAnalysis(models.Model):
         db_table = 'user_analyses'
 
 class GeneratedPlaylist(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
     playlist_id = models.CharField(max_length=255)
     name = models.CharField(max_length=255)
     description = models.TextField()
