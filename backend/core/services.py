@@ -145,7 +145,7 @@ IMPORTANT:
         }
         
         payload = {
-            "model": "deepseek-ai/deepseek-v3",
+            "model": "deepseek/deepseek-chat:free",
             "messages": [
                 {"role": "system", "content": "You are a music psychologist that analyzes people's music taste and provides insights about their personality."},
                 {"role": "user", "content": prompt}
@@ -186,7 +186,7 @@ IMPORTANT:
         }
         
         payload = {
-            "model": "deepseek-ai/deepseek-v3",
+            "model": "deepseek/deepseek-chat:free",
             "messages": [
                 {"role": "system", "content": "You are a music curator that creates personalized playlists based on user preferences."},
                 {"role": "user", "content": prompt}
