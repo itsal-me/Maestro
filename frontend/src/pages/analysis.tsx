@@ -37,6 +37,7 @@ export default function AnalysisPage() {
             setIsLoading(true);
             try {
                 const data = await api.getUserAnalyses(user.id);
+                console.log("Fetched analyses:", data);
                 setAnalyses(data);
             } catch (error) {
                 console.error("Error fetching analyses:", error);
@@ -54,6 +55,7 @@ export default function AnalysisPage() {
         setIsAnalyzing(true);
         try {
             const newAnalysis = await api.analyzeUser(user.id);
+            console.log("New analysis:", newAnalysis);
             setAnalyses([newAnalysis, ...analyses]);
             toast("Your music personality analysis has been updated.");
         } catch (error) {
