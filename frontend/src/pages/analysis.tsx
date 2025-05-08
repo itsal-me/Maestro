@@ -30,6 +30,9 @@ export default function AnalysisPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+    console.log("User in AnalysisPage:", user);
+    console.log("User ID in AnalysisPage:", user?.id);
+
     useEffect(() => {
         const fetchAnalyses = async () => {
             if (!user) return;
