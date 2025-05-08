@@ -22,36 +22,49 @@ class SpotifyCallbackView(APIView):
             return Response({'error': 'Authorization code not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            # Step 1: Exchange code for tokens
             tokens = SpotifyService.get_tokens(code)
+            access_token = tokens['access_token']
+            refresh_token = tokens['refresh_token']
+            token_expires = datetime.datetime.now() + datetime.timedelta(seconds=tokens['expires_in'])
 
-            # Get user data from Spotify
-            sp_data = SpotifyService.get_user_data(tokens['access_token'])
+            # Step 2: Fetch Spotify user info
+            sp_data = SpotifyService.get_user_data(access_token)
             spotify_user = sp_data['user']
             spotify_id = spotify_user['id']
+            display_name = spotify_user.get('display_name', '')
 
-            # Try to find existing user profile
+            # Step 3: Try to find existing UserProfile
             try:
                 user_profile = UserProfile.objects.get(spotify_id=spotify_id)
                 user = user_profile.user
                 created = False
             except UserProfile.DoesNotExist:
-                # Create Django user
+                # Create Django User
                 user = User.objects.create(
-                    username=spotify_user.get('display_name', spotify_id)
+                    username=spotify_id,
+                    first_name=display_name
                 )
 
                 # Create UserProfile
                 user_profile = UserProfile.objects.create(
                     user=user,
-                    spotify_id=spotify_id
+                    spotify_id=spotify_id,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    token_expires=token_expires
                 )
                 created = True
+            else:
+                # If user exists, update tokens and display name if needed
+                user_profile.access_token = access_token
+                user_profile.refresh_token = refresh_token
+                user_profile.token_expires = token_expires
+                user_profile.save()
 
-            # Update tokens in UserProfile
-            user_profile.access_token = tokens['access_token']
-            user_profile.refresh_token = tokens['refresh_token']
-            user_profile.token_expires = datetime.datetime.now() + datetime.timedelta(seconds=tokens['expires_in'])
-            user_profile.save()
+                if user.first_name != display_name:
+                    user.first_name = display_name
+                    user.save()
 
             return Response({
                 'user_id': user_profile.id,
@@ -61,6 +74,7 @@ class SpotifyCallbackView(APIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class AnalyzeUserView(APIView):
     def post(self, request):
