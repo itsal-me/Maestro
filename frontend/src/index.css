@@ -112,6 +112,15 @@
     --sidebar-ring: oklch(0.556 0 0);
 }
 
+@layer utilities {
+    .bg-spotify-green {
+        background-color: #1db954;
+    }
+    .bg-spotify-black {
+        background-color: #191414;
+    }
+}
+
 @layer base {
     * {
         @apply border-border outline-ring/50;
@@ -119,5 +128,14 @@
     body {
         @apply bg-background text-foreground;
         font-family: "Manrope", sans-serif;
+        font-feature-settings: "rlig" 1, "calt" 1;
+    }
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        @apply font-bold tracking-tight;
     }
 }

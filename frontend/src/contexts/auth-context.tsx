@@ -1,57 +1,98 @@
 "use client";
 
-import type React from "react";
-
-import { createContext, useContext, useState, useEffect } from "react";
-
+import {
+    createContext,
+    useContext,
+    useState,
+    useEffect,
+    type ReactNode,
+} from "react";
 import { toast } from "sonner";
+import { api, apiService } from "@/lib/api";
 
 interface User {
     id: number;
     spotify_id: string;
+    display_name: string;
+    images: { url: string }[];
     access_token: string;
+    token_expires: string;
+    refresh_token: string;
+}
+
+interface SpotifyData {
+    display_name: string;
+    email: string;
+    images: { url: string }[];
+    top_tracks: { items: any[] };
+    top_artists: { items: any[] };
+    recently_played: { items: any[] };
+    followers: number;
 }
 
 interface AuthContextType {
     user: User | null;
-    isAuthenticated: boolean;
+    spotifyData: SpotifyData | null;
     isLoading: boolean;
-    login: () => Promise<void>;
+    isAuthenticated: boolean;
+    login: () => void;
     logout: () => void;
-    setUserData: (userData: User) => void;
+    refreshToken: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
+    const [spotifyData, setSpotifyData] = useState<SpotifyData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Check if user data exists in localStorage
-        const storedUser = localStorage.getItem("maestro_user");
-        if (storedUser) {
-            try {
-                setUser(JSON.parse(storedUser));
-            } catch (error) {
-                console.error("Failed to parse user data:", error);
-                localStorage.removeItem("maestro_user");
+        const fetchData = async () => {
+            const storedUser = localStorage.getItem("maestro_user");
+            if (storedUser) {
+                try {
+                    const parsedUser = JSON.parse(storedUser);
+                    setUser(parsedUser);
+
+                    // Fetch user profile data
+                    if (parsedUser) {
+                        const profileResponse = await apiService.getUserProfile(
+                            parsedUser.id
+                        );
+                        setSpotifyData({
+                            display_name: profileResponse.data.display_name,
+                            email: profileResponse.data.email,
+                            followers: profileResponse.data.followers,
+                            images: profileResponse.data.images,
+                            top_tracks: profileResponse.data.top_tracks,
+                            top_artists: profileResponse.data.top_artists,
+                            recently_played:
+                                profileResponse.data.recently_played,
+                        });
+                    }
+
+                    // Check if token is expired
+                    const tokenExpires = new Date(parsedUser.token_expires);
+                    if (tokenExpires < new Date()) {
+                        await refreshToken();
+                    }
+                } catch (error) {
+                    console.error("Failed to parse stored user:", error);
+                    localStorage.removeItem("maestro_user");
+                }
             }
-        }
-        setIsLoading(false);
+            setIsLoading(false);
+        };
+
+        fetchData();
     }, []);
 
     const login = async () => {
         try {
-            const response = await fetch(
-                `${import.meta.env.VITE_API_URL}/auth/spotify/`
-            );
-            const data = await response.json();
-
-            if (data.auth_url) {
-                window.location.href = data.auth_url;
-            } else {
-                throw new Error("Failed to get Spotify auth URL");
+            const response = await api.get("/auth/spotify/");
+            if (response.data && response.data.auth_url) {
+                window.location.href = response.data.auth_url;
             }
         } catch (error) {
             console.error("Login error:", error);
@@ -65,20 +106,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast("You have been successfully logged out.");
     };
 
-    const setUserData = (userData: User) => {
-        setUser(userData);
-        localStorage.setItem("maestro_user", JSON.stringify(userData));
+    const refreshToken = async () => {
+        if (!user || !user.refresh_token) return;
+
+        try {
+            setIsLoading(true);
+            const response = await api.post("/auth/spotify/refresh-token/", {
+                refresh_token: user.refresh_token,
+            });
+
+            if (response.data && response.data.access_token) {
+                const updatedUser = {
+                    ...user,
+                    access_token: response.data.access_token,
+                    token_expires: new Date(
+                        Date.now() + 3600 * 1000
+                    ).toISOString(),
+                };
+                setUser(updatedUser);
+                localStorage.setItem(
+                    "maestro_user",
+                    JSON.stringify(updatedUser)
+                );
+            }
+        } catch (error) {
+            console.error("Token refresh error:", error);
+            // If refresh fails, log the user out
+            logout();
+            toast("Please log in again.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
         <AuthContext.Provider
             value={{
                 user,
-                isAuthenticated: !!user,
+                spotifyData,
                 isLoading,
+                isAuthenticated: !!user,
                 login,
                 logout,
-                setUserData,
+                refreshToken,
             }}
         >
             {children}
@@ -86,10 +156,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 }
 
-export function useAuth() {
+export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) {
         throw new Error("useAuth must be used within an AuthProvider");
     }
     return context;
-}
+};

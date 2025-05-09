@@ -1,70 +1,97 @@
-import { toast } from "sonner"
+import axios from "axios"
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+// Create an axios instance with base URL
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
+  headers: {
+    "Content-Type": "application/json",
+  },
+})
 
-interface ApiOptions {
-  method?: string
-  headers?: Record<string, string>
-  body?: any
-}
+// Add a request interceptor to include auth token
+api.interceptors.request.use(
+  (config) => {
+    const storedUser = localStorage.getItem("maestro_user")
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser)
+        if (user.access_token) {
+          config.headers.Authorization = `Bearer ${user.access_token}`
+        }
+      } catch (error) {
+        console.error("Error parsing stored user:", error)
+      }
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  },
+)
 
-export async function apiRequest<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
-  const { method = "GET", headers = {}, body } = options
+// Add a response interceptor to handle token refresh
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
 
-  const requestOptions: RequestInit = {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...headers,
-    },
-  }
+    // If the error is due to an expired token and we haven't already tried to refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
 
-  if (body) {
-    requestOptions.body = JSON.stringify(body)
-  }
+      try {
+        const storedUser = localStorage.getItem("maestro_user")
+        if (storedUser) {
+          const user = JSON.parse(storedUser)
 
-  try {
-    const response = await fetch(`${API_URL}${endpoint}`, requestOptions)
+          // Call the refresh token endpoint
+          const response = await axios.post(
+            `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/auth/spotify/refresh-token/`,
+            { refresh_token: user.refresh_token },
+          )
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Request failed with status ${response.status}`)
+          if (response.data && response.data.access_token) {
+            // Update the stored user with the new token
+            const updatedUser = {
+              ...user,
+              access_token: response.data.access_token,
+              token_expires: new Date(Date.now() + 3600 * 1000).toISOString(),
+            }
+            localStorage.setItem("maestro_user", JSON.stringify(updatedUser))
+
+            // Update the Authorization header and retry the original request
+            originalRequest.headers.Authorization = `Bearer ${response.data.access_token}`
+            return axios(originalRequest)
+          }
+        }
+      } catch (refreshError) {
+        console.error("Token refresh failed:", refreshError)
+        // If refresh fails, redirect to login
+        localStorage.removeItem("maestro_user")
+        window.location.href = "/login"
+      }
     }
 
-    return await response.json()
-  } catch (error) {
-    console.error("API request failed:", error)
-    toast(error instanceof Error ? error.message : "An unknown error occurred");
-    throw error
-  }
-}
+    return Promise.reject(error)
+  },
+)
 
-export const api = {
-  // Auth endpoints
-  getSpotifyAuthUrl: () => apiRequest<{ auth_url: string }>("/auth/spotify/"),
+// API service functions
+export const apiService = {
+  // Auth
+  getSpotifyAuthUrl: () => api.get("/auth/spotify/"),
+  handleCallback: (code: string) => api.get(`/auth/spotify/callback/?code=${code}`),
+  refreshToken: (refreshToken: string) => api.post("/auth/spotify/refresh-token/", { refresh_token: refreshToken }),
 
-  // User endpoints
-  getUserProfile: (userId: number) => apiRequest<any>(`/users/${userId}/profile/`),
+  // User
+  getUserProfile: (userId: number) => api.get(`/users/${userId}/profile/`),
 
-  // User analysis endpoints
-  analyzeUser: (userId: number) =>
-    apiRequest<any>("/analyze/", {
-      method: "POST",
-      body: { user_id: userId },
-    }),
+  // Analysis
+  analyzeUser: (userId: number) => api.post("/analyze/", { user_id: userId }),
+  getUserAnalyses: (userId: number) => api.get(`/users/${userId}/analyses/`),
 
-  getUserAnalyses: (userId: number) => apiRequest<any[]>(`/users/${userId}/analyses/`),
-
-  // Playlist endpoints
+  // Playlists
   generatePlaylist: (userId: number, mood?: string, prompt?: string) =>
-    apiRequest<any>("/generate-playlist/", {
-      method: "POST",
-      body: {
-        user_id: userId,
-        mood,
-        prompt,
-      },
-    }),
-
-  getUserPlaylists: (userId: number) => apiRequest<any[]>(`/users/${userId}/playlists/`),
+    api.post("/generate-playlist/", { user_id: userId, mood, prompt }),
+  getUserPlaylists: (userId: number) => api.get(`/users/${userId}/playlists/`),
 }

@@ -2,192 +2,190 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Music } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { apiService } from "@/lib/api";
+import { Music, Loader2 } from "lucide-react";
 
-const moods = [
-    { value: "happy", label: "Happy" },
-    { value: "chill", label: "Chill" },
-    { value: "energetic", label: "Energetic" },
-    { value: "focus", label: "Focus" },
-    { value: "sad", label: "Sad" },
-    { value: "romantic", label: "Romantic" },
-    { value: "party", label: "Party" },
-    { value: "custom", label: "Custom Prompt" },
+const moodOptions = [
+    "Happy",
+    "Energetic",
+    "Chill",
+    "Focused",
+    "Melancholic",
+    "Romantic",
+    "Party",
+    "Workout",
+    "Study",
+    "Relaxing",
 ];
 
-export default function GeneratePlaylistPage() {
+export default function PlaylistGeneratorPage() {
     const { user } = useAuth();
-    const navigate = useNavigate();
 
-    const [selectedMood, setSelectedMood] = useState("");
+    const navigate = useNavigate();
+    const [selectedMood, setSelectedMood] = useState<string | null>(null);
     const [customPrompt, setCustomPrompt] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
 
+    const handleMoodSelect = (mood: string) => {
+        setSelectedMood(mood === selectedMood ? null : mood);
+    };
+
     const handleGenerate = async () => {
         if (!user) return;
-        if (!selectedMood) {
-            toast("Please select a mood or choose custom prompt.");
+
+        if (!selectedMood && !customPrompt.trim()) {
+            toast("Please select a mood or enter a custom prompt.");
             return;
         }
 
-        if (selectedMood === "custom" && !customPrompt.trim()) {
-            toast("Please enter a custom prompt for your playlist.");
-            return;
-        }
-
-        setIsGenerating(true);
         try {
-            const mood = selectedMood === "custom" ? undefined : selectedMood;
-            const prompt = selectedMood === "custom" ? customPrompt : undefined;
-
-            await api.generatePlaylist(user.id, mood, prompt);
-
-            toast(
-                "Your new playlist has been created and saved to your Spotify account."
+            setIsGenerating(true);
+            const response = await apiService.generatePlaylist(
+                user.id,
+                selectedMood || undefined,
+                customPrompt.trim() || undefined
             );
+
+            toast("Your new playlist has been created and saved to Spotify!");
 
             navigate("/playlists");
         } catch (error) {
             console.error("Error generating playlist:", error);
-            toast("Could not generate playlist. Please try again.");
+            toast("Could not generate your playlist. Please try again.");
         } finally {
             setIsGenerating(false);
         }
     };
 
     return (
-        <div className="space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                    Generate Playlist
-                </h1>
+        <div className="container mx-auto px-4 py-8">
+            <header className="mb-8">
+                <h1 className="text-3xl font-bold">Generate Playlist</h1>
                 <p className="text-muted-foreground">
-                    Create a new AI-generated playlist based on your
-                    preferences.
+                    Create a custom playlist based on your mood or prompt
                 </p>
-            </div>
+            </header>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Playlist Options</CardTitle>
-                    <CardDescription>
-                        Choose a mood or create a custom prompt for your
-                        playlist.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                        <Label>Select a mood for your playlist</Label>
-                        <RadioGroup
-                            value={selectedMood}
-                            onValueChange={setSelectedMood}
-                            className="grid grid-cols-2 sm:grid-cols-4 gap-2"
-                        >
-                            {moods.map((mood) => (
-                                <div
-                                    key={mood.value}
-                                    className="flex items-center space-x-2"
-                                >
-                                    <RadioGroupItem
-                                        value={mood.value}
-                                        id={mood.value}
-                                    />
-                                    <Label
-                                        htmlFor={mood.value}
-                                        className="cursor-pointer"
+            <div className="max-w-2xl mx-auto">
+                <Card className="bg-zinc-900/60 border-zinc-800 mb-8">
+                    <CardContent className="pt-6">
+                        <div className="mb-6">
+                            <Label className="text-lg mb-2 block">
+                                Select a Mood
+                            </Label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                                {moodOptions.map((mood) => (
+                                    <Button
+                                        key={mood}
+                                        type="button"
+                                        variant={
+                                            selectedMood === mood
+                                                ? "default"
+                                                : "outline"
+                                        }
+                                        className={`
+                      border-zinc-700 hover:bg-zinc-800 hover:text-white
+                      ${
+                          selectedMood === mood
+                              ? "bg-spotify-green text-black border-spotify-green"
+                              : ""
+                      }
+                    `}
+                                        onClick={() => handleMoodSelect(mood)}
                                     >
-                                        {mood.label}
-                                    </Label>
-                                </div>
-                            ))}
-                        </RadioGroup>
-                    </div>
+                                        {mood}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
 
-                    {selectedMood === "custom" && (
-                        <div className="space-y-2">
-                            <Label htmlFor="custom-prompt">Custom Prompt</Label>
+                        <div className="mb-6">
+                            <Label
+                                htmlFor="custom-prompt"
+                                className="text-lg mb-2 block"
+                            >
+                                Enter a Prompt
+                            </Label>
                             <Textarea
                                 id="custom-prompt"
-                                placeholder="E.g., Create a playlist for a road trip through the mountains with indie folk and ambient music"
+                                placeholder="E.g., A playlist for a road trip through the mountains with indie folk and ambient music"
+                                className="bg-zinc-800 border-zinc-700 resize-none"
+                                rows={4}
                                 value={customPrompt}
                                 onChange={(e) =>
                                     setCustomPrompt(e.target.value)
                                 }
-                                className="min-h-[100px]"
                             />
-                            <p className="text-xs text-muted-foreground">
-                                Be specific about the vibe, genres, or
-                                activities for better results.
+                            <p className="text-xs text-zinc-500 mt-1">
+                                Be specific about the vibe, genres, or occasion
+                                for better results
                             </p>
                         </div>
-                    )}
-                </CardContent>
-                <CardFooter className="flex justify-end">
-                    <Button
-                        onClick={handleGenerate}
-                        disabled={isGenerating}
-                        className="flex items-center gap-2"
-                    >
-                        {isGenerating ? (
-                            <>
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent"></div>
-                                Generating...
-                            </>
-                        ) : (
-                            <>
-                                <Music className="h-4 w-4" />
-                                Generate Playlist
-                            </>
-                        )}
-                    </Button>
-                </CardFooter>
-            </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>How It Works</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <h3 className="font-medium">
-                            1. Choose a Mood or Custom Prompt
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                            Select one of our predefined moods or create a
-                            custom prompt to describe exactly what you want.
-                        </p>
-                    </div>
-                    <div className="space-y-2">
-                        <h3 className="font-medium">2. AI Analysis</h3>
-                        <p className="text-sm text-muted-foreground">
-                            Our AI analyzes your music taste and the selected
-                            mood to create a personalized playlist.
-                        </p>
-                    </div>
-                    <div className="space-y-2">
-                        <h3 className="font-medium">3. Playlist Creation</h3>
-                        <p className="text-sm text-muted-foreground">
-                            The generated playlist is automatically saved to
-                            your Spotify account and ready to play.
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
+                        <Button
+                            onClick={handleGenerate}
+                            // disabled={isGenerating}
+                            disabled
+                            className="w-full"
+                            size="lg"
+                        >
+                            {isGenerating ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Generating Playlist...
+                                </>
+                            ) : (
+                                <>
+                                    <Music className="mr-2 h-5 w-5" />
+                                    Generate Playlist
+                                </>
+                            )}
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                <div className="bg-zinc-900/30 rounded-lg p-6 border border-zinc-800">
+                    <h3 className="text-lg font-medium mb-3">
+                        Tips for Great Playlists
+                    </h3>
+                    <ul className="space-y-2 text-zinc-400">
+                        <li className="flex items-start gap-2">
+                            <span className="text-spotify-green">•</span>
+                            <span>
+                                Combine a mood with specific genres for more
+                                targeted results
+                            </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                            <span className="text-spotify-green">•</span>
+                            <span>
+                                Mention activities like "workout," "studying,"
+                                or "dinner party"
+                            </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                            <span className="text-spotify-green">•</span>
+                            <span>
+                                Include time periods or decades for era-specific
+                                playlists
+                            </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                            <span className="text-spotify-green">•</span>
+                            <span>
+                                Reference artists you like for similar-sounding
+                                recommendations
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
         </div>
     );
 }

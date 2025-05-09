@@ -1,7 +1,8 @@
 import requests
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from datetime import datetime, timedelta
+from django.utils import timezone
+from datetime import timedelta
 import json
 from django.conf import settings
 from .utils import format_spotify_data_for_ai
@@ -25,25 +26,54 @@ class SpotifyService:
             redirect_uri=settings.SPOTIFY_REDIRECT_URI
         )
         tokens = auth_manager.get_access_token(code)
+
+        # Guard against None or unexpected return
+        if not tokens or not isinstance(tokens, dict) or "access_token" not in tokens:
+            raise ValueError("Invalid token response from Spotify")
+
         return tokens
+    
+    @staticmethod
+    def refresh_access_token(refresh_token):
+        auth_manager = SpotifyOAuth(
+            client_id=settings.SPOTIFY_CLIENT_ID,
+            client_secret=settings.SPOTIFY_CLIENT_SECRET,
+            redirect_uri=settings.SPOTIFY_REDIRECT_URI
+        )
+        token_info = auth_manager.refresh_access_token(refresh_token)
+        return token_info
 
     @staticmethod
-    def get_user_data(access_token):
+    def get_valid_access_token(user_profile):
+        if user_profile.token_expires <= timezone.now():
+            token_info = SpotifyService.refresh_access_token(user_profile.refresh_token)
+
+            user_profile.access_token = token_info['access_token']
+            user_profile.token_expires = timezone.now() + timedelta(seconds=token_info['expires_in'])
+
+            if 'refresh_token' in token_info:
+                user_profile.refresh_token = token_info['refresh_token']
+            
+            user_profile.save()
+        
+        return user_profile.access_token
+
+
+    @staticmethod
+    def get_user_data(user_profile=None, access_token=None):
+        if not access_token:
+            if not user_profile:
+                raise ValueError("Must provide either user_profile or access_token")
+            access_token = SpotifyService.get_valid_access_token(user_profile)
+
         sp = spotipy.Spotify(auth=access_token)
+
         user = sp.current_user()
-        
-        # Get top tracks
         top_tracks = sp.current_user_top_tracks(limit=50, time_range='medium_term')
-        
-        # Get top artists
         top_artists = sp.current_user_top_artists(limit=50, time_range='medium_term')
-        
-        # Get recently played
         recently_played = sp.current_user_recently_played(limit=50)
-        
-        # Get saved tracks
         saved_tracks = sp.current_user_saved_tracks(limit=50)
-        
+
         return {
             'user': user,
             'top_tracks': top_tracks,
@@ -52,8 +82,11 @@ class SpotifyService:
             'saved_tracks': saved_tracks
         }
 
+    
+        
     @staticmethod
-    def create_playlist(user_id, access_token, name, description, tracks):
+    def create_playlist(user_id, name, description, tracks, user_profile=None):
+        access_token = SpotifyService.get_valid_access_token(user_profile)
         sp = spotipy.Spotify(auth=access_token)
         playlist = sp.user_playlist_create(
             user=user_id,
@@ -100,10 +133,8 @@ You are a music psychologist analyzing a user's Spotify data to provide insights
 
 ### Response Format (STRICT JSON ONLY):
 {{
-  "personality_type": {{
-    "label": "",
-    "description": ""
-  }},
+  "personality_type": "",
+  "description": "",
   "analytics": {{
     "top_genres": [],
     "mood_distribution": {{
@@ -134,6 +165,7 @@ You are a music psychologist analyzing a user's Spotify data to provide insights
 
 IMPORTANT:
 - Respond with ONLY the JSON object
+- Ensure the KEY values are EXACTLY SAME as provided
 - Do not include any explanatory text
 - Ensure all brackets and quotes are properly closed
 - Maintain consistent formatting
@@ -155,6 +187,8 @@ IMPORTANT:
         
         response = requests.post(settings.OPENROUTER_API_URL, headers=headers, json=payload)
         response.raise_for_status()
+
+        # print("AI Response:", response.json()['choices'][0]['message']['content'])  # Debugging line
         
         return response.json()['choices'][0]['message']['content']
 

@@ -7,14 +7,16 @@ from .services import SpotifyService, AIService
 from django.contrib.auth.models import User
 from .models import UserProfile, UserAnalysis, GeneratedPlaylist
 from .serializers import UserAnalysisSerializer, GeneratedPlaylistSerializer
-import datetime
+from datetime import timedelta
+from django.utils import timezone
 import json
+from django.http import JsonResponse as JSONRESPONSE
 
 class SpotifyAuthView(APIView):
     def get(self, request):
         auth_url = SpotifyService.get_auth_url()
         return Response({'auth_url': auth_url})
-
+    
 class SpotifyCallbackView(APIView):
     def get(self, request):
         code = request.GET.get('code')
@@ -24,53 +26,82 @@ class SpotifyCallbackView(APIView):
         try:
             # Step 1: Exchange code for tokens
             tokens = SpotifyService.get_tokens(code)
+            
+            if not tokens or 'access_token' not in tokens:
+                return Response({'error': 'Failed to retrieve tokens from Spotify'}, status=status.HTTP_400_BAD_REQUEST)
+
             access_token = tokens['access_token']
-            refresh_token = tokens['refresh_token']
-            token_expires = datetime.datetime.now() + datetime.timedelta(seconds=tokens['expires_in'])
+            refresh_token = tokens.get('refresh_token')
+            token_expires = timezone.now() + timedelta(seconds=tokens.get('expires_in', 3600))  # fallback to 1h
 
             # Step 2: Fetch Spotify user info
-            sp_data = SpotifyService.get_user_data(access_token)
+            sp_data = SpotifyService.get_user_data(access_token=access_token)
             spotify_user = sp_data['user']
             spotify_id = spotify_user['id']
             display_name = spotify_user.get('display_name', '')
 
-            # Step 3: Try to find existing UserProfile
-            try:
-                user_profile = UserProfile.objects.get(spotify_id=spotify_id)
-                user = user_profile.user
-                created = False
-            except UserProfile.DoesNotExist:
-                # Create Django User
-                user = User.objects.create(
-                    username=spotify_id,
-                    first_name=display_name
-                )
+            user, _ = User.objects.get_or_create(
+                username=spotify_id,
+                defaults={'first_name': display_name}
+            )
 
-                # Create UserProfile
-                user_profile = UserProfile.objects.create(
-                    user=user,
-                    spotify_id=spotify_id,
-                    access_token=access_token,
-                    refresh_token=refresh_token,
-                    token_expires=token_expires
-                )
-                created = True
-            else:
-                # If user exists, update tokens and display name if needed
+            # Step 3: Get or create User + UserProfile
+            user_profile, created = UserProfile.objects.get_or_create(
+                spotify_id=spotify_id,
+                defaults={
+                    'user': user,
+                    'access_token': access_token,
+                    'refresh_token': refresh_token,
+                    'token_expires': token_expires,
+                }
+            )
+
+            if not created:
                 user_profile.access_token = access_token
-                user_profile.refresh_token = refresh_token
+                if refresh_token:
+                    user_profile.refresh_token = refresh_token
                 user_profile.token_expires = token_expires
                 user_profile.save()
 
-                if user.first_name != display_name:
-                    user.first_name = display_name
-                    user.save()
+                if user_profile.user.first_name != display_name:
+                    user_profile.user.first_name = display_name
+                    user_profile.user.save()
 
+            
             return Response({
                 'user_id': user_profile.id,
                 'spotify_id': user_profile.spotify_id,
-                'access_token': user_profile.access_token
+                'access_token': user_profile.access_token,
+                'token_expires': user_profile.token_expires.isoformat(),
             })
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class RefreshTokenView(APIView):
+    def post(self, request):
+        refresh_token = request.data.get('refresh_token')
+        if not refresh_token:
+            return Response({'error': 'Refresh token not provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Refresh the access token using the refresh token
+            tokens = SpotifyService.refresh_access_token(refresh_token)
+
+            # Update the user profile with the new access token and refresh token (if applicable)
+            user_profile = UserProfile.objects.get(refresh_token=refresh_token)
+            user_profile.access_token = tokens['access_token']
+            if 'refresh_token' in tokens:
+                user_profile.refresh_token = tokens['refresh_token']
+            user_profile.token_expires = timezone.now() + timedelta(seconds=tokens['expires_in'])
+            user_profile.save()
+
+            return Response({
+                'access_token': user_profile.access_token,
+            })
+
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'User profile not found'}, status=status.HTTP_404_NOT_FOUND)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -81,10 +112,13 @@ class UserProfileView(APIView):
         try:
             #return spotify user data from spotifyservice.get_user_data
             user_profile = UserProfile.objects.get(id=user_id)
-            sp_data = SpotifyService.get_user_data(user_profile.access_token)
+            sp_data = SpotifyService.get_user_data(user_profile=user_profile)
             user_data = {
                 'spotify_id': user_profile.spotify_id,
                 'display_name': sp_data['user'].get('display_name', ''),
+                'email': sp_data['user'].get('email', ''),
+                'followers': sp_data['user'].get('followers', {}).get('total', 0),
+                'images': sp_data['user'].get('images', []),
                 'country': sp_data['user'].get('country', ''),
                 'top_tracks': sp_data['top_tracks'],
                 'top_artists': sp_data['top_artists'],
@@ -106,21 +140,28 @@ class AnalyzeUserView(APIView):
 
         try:
             user = UserProfile.objects.get(id=user_id)
-            sp_data = SpotifyService.get_user_data(user.access_token)
+            sp_data = SpotifyService.get_user_data(user_profile=user)
 
             # Get AI analysis
             ai_response = AIService.analyze_music_data(sp_data)
             analysis_data = json.loads(ai_response)
 
+            
+
             # Save analysis to database
             analysis = UserAnalysis.objects.create(
                 user=user,
                 personality_type=analysis_data.get('personality_type', ''),
+                description=analysis_data.get('description', ''),
                 music_analytics=analysis_data.get('analytics', {}),
+                insights=analysis_data.get('insights', []),
+                recommendations=analysis_data.get('recommendations', {})
             )
 
             serializer = UserAnalysisSerializer(analysis)
+            
             return Response(serializer.data)
+        
 
         except UserProfile.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -136,9 +177,12 @@ class GeneratePlaylistView(APIView):
         if not user_id:
             return Response({'error': 'User ID not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if not mood and not prompt:
+            return Response({'error': 'Either mood or prompt must be provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             user = UserProfile.objects.get(id=user_id)
-            sp_data = SpotifyService.get_user_data(user.access_token)
+            sp_data = SpotifyService.get_user_data(userprofile=user)
 
             # Get playlist from AI
             ai_response = AIService.generate_playlist(sp_data, mood, prompt)
@@ -147,10 +191,10 @@ class GeneratePlaylistView(APIView):
             # Create playlist on Spotify
             playlist = SpotifyService.create_playlist(
                 user.spotify_id,
-                user.access_token,
                 playlist_data['name'],
                 playlist_data['description'],
-                playlist_data['tracks']
+                playlist_data['tracks'],
+                user_profile=user
             )
 
             # Save to database
@@ -176,7 +220,10 @@ class UserAnalysesView(APIView):
         try:
             analyses = UserAnalysis.objects.filter(user_id=user_id).order_by('-generated_at')
             serializer = UserAnalysisSerializer(analyses, many=True)
+
             return Response(serializer.data)
+        
+
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

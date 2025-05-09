@@ -14,8 +14,11 @@ class UserProfile(models.Model):
 class UserAnalysis(models.Model):
     user = models.ForeignKey(UserProfile, on_delete=models.CASCADE) 
     personality_type = models.CharField(max_length=255)
+    description = models.TextField(default="", blank=True)
     music_analytics = models.JSONField()
     generated_at = models.DateTimeField(auto_now_add=True)
+    insights = models.JSONField(default=list)
+    recommendations = models.JSONField(default=dict)
 
     class Meta:
         db_table = 'user_analyses'

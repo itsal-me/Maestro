@@ -38,6 +38,7 @@ dist/
 build/
 .vite/
 .cache/
+.cache
 *.tsbuildinfo
 
 # Vite env files

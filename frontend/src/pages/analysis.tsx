@@ -1,231 +1,415 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/contexts/auth-context";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
     Card,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api";
-import { RefreshCw, User, BarChart, Music } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/auth-context";
+import { apiService } from "@/lib/api";
+import { BarChart2, Music, Loader2 } from "lucide-react";
 
 interface Analysis {
     id: number;
     personality_type: string;
-    music_analytics: any;
+    description: string;
+    music_analytics: {
+        top_genres: string[];
+        mood_distribution: {
+            happy: number;
+            melancholic: number;
+            energetic: number;
+            calm: number;
+            angsty: number;
+        };
+        audio_features: {
+            energy_level: string;
+            danceability: number;
+            acousticness: number;
+            instrumentalness: number;
+            complexity: number;
+        };
+    };
+    insights: string[];
+    recommendations: {
+        similar_artists: string[];
+        growth_opportunities: string[];
+    };
     generated_at: string;
 }
 
 export default function AnalysisPage() {
     const { user } = useAuth();
 
-    const [analyses, setAnalyses] = useState<Analysis[]>([]);
+    const [analysis, setAnalysis] = useState<Analysis | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-    console.log("User in AnalysisPage:", user);
-    console.log("User ID in AnalysisPage:", user?.id);
-
     useEffect(() => {
-        const fetchAnalyses = async () => {
+        const fetchAnalysis = async () => {
             if (!user) return;
 
-            setIsLoading(true);
             try {
-                const data = await api.getUserAnalyses(user.id);
-                console.log("Fetched analyses:", data);
-                setAnalyses(data);
+                setIsLoading(true);
+                const response = await apiService.getUserAnalyses(user.id);
+                if (response.data && response.data.length > 0) {
+                    setAnalysis(response.data[0]);
+                }
             } catch (error) {
-                console.error("Error fetching analyses:", error);
+                console.error("Error fetching analysis:", error);
+                toast("Failed to load your analysis. Please try again.");
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchAnalyses();
-    }, [user]);
+        fetchAnalysis();
+    }, [user, toast]);
 
-    const handleAnalyze = async () => {
+    const generateAnalysis = async () => {
         if (!user) return;
 
-        setIsAnalyzing(true);
         try {
-            const newAnalysis = await api.analyzeUser(user.id);
-            console.log("New analysis:", newAnalysis);
-            setAnalyses([newAnalysis, ...analyses]);
-            toast("Your music personality analysis has been updated.");
+            setIsAnalyzing(true);
+            const response = await apiService.analyzeUser(user.id);
+            setAnalysis(response.data);
+            toast("Your music personality analysis is ready!");
         } catch (error) {
-            console.error("Error analyzing user:", error);
-            toast("Could not complete the analysis. Please try again.");
+            console.error("Error generating analysis:", error);
+            toast("Could not generate your analysis. Please try again.");
         } finally {
             setIsAnalyzing(false);
         }
     };
 
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
-                <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-            </div>
-        );
-    }
-
     return (
-        <div className="space-y-8">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">
-                        Music Personality Analysis
-                    </h1>
-                    <p className="text-muted-foreground">
-                        Discover insights about your music taste and
-                        preferences.
-                    </p>
-                </div>
-                <Button
-                    onClick={handleAnalyze}
-                    disabled={isAnalyzing}
-                    className="flex items-center gap-2"
-                >
-                    {isAnalyzing ? (
-                        <>
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                            Analyzing...
-                        </>
-                    ) : (
-                        <>
-                            <RefreshCw className="h-4 w-4" />
-                            New Analysis
-                        </>
-                    )}
-                </Button>
-            </div>
+        <div className="container mx-auto px-4 py-8">
+            <header className="mb-8">
+                <h1 className="text-3xl font-bold">
+                    Music Personality Analysis
+                </h1>
+                <p className="text-muted-foreground">
+                    Discover insights about your music taste
+                </p>
+            </header>
 
-            {analyses.length > 0 ? (
-                <Tabs
-                    defaultValue={analyses[0].id.toString()}
-                    className="space-y-4"
-                >
-                    <TabsList className="flex overflow-x-auto pb-2">
-                        {analyses.map((analysis) => (
-                            <TabsTrigger
-                                key={analysis.id}
-                                value={analysis.id.toString()}
-                            >
+            {isLoading ? (
+                <div className="space-y-6">
+                    <Skeleton className="h-8 w-64" />
+                    <Skeleton className="h-32 w-full" />
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <Skeleton className="h-64 w-full" />
+                        <Skeleton className="h-64 w-full" />
+                    </div>
+                </div>
+            ) : analysis ? (
+                <div className="space-y-8">
+                    <Card className="bg-zinc-900/60 border-zinc-800">
+                        <CardHeader>
+                            <CardTitle className="text-2xl text-spotify-green">
+                                {analysis.personality_type || "Null"}
+                            </CardTitle>
+                            <CardDescription>
+                                Analyzed on{" "}
                                 {new Date(
                                     analysis.generated_at
-                                ).toLocaleDateString()}
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
+                                ).toLocaleDateString() || "Null"}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-zinc-200">
+                                {analysis.description || "Null"}
+                            </p>
+                        </CardContent>
+                    </Card>
 
-                    {analyses.map((analysis) => (
-                        <TabsContent
-                            key={analysis.id}
-                            value={analysis.id.toString()}
-                            className="space-y-4"
-                        >
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-2xl">
-                                        Your Music Personality:{" "}
-                                        {analysis.personality_type}
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Analysis from{" "}
-                                        {new Date(
-                                            analysis.generated_at
-                                        ).toLocaleString()}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    {Object.entries(
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <Card className="bg-zinc-900/60 border-zinc-800">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <BarChart2 className="h-5 w-5 text-spotify-green" />
+                                    Mood Distribution
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {analysis.music_analytics?.mood_distribution ? (
+                                    Object.entries(
                                         analysis.music_analytics
-                                    ).map(([category, data]) => (
-                                        <div
-                                            key={category}
-                                            className="space-y-2"
-                                        >
-                                            <h3 className="text-lg font-medium capitalize flex items-center gap-2">
-                                                {category === "top_genres" && (
-                                                    <Music className="h-5 w-5" />
-                                                )}
-                                                {category ===
-                                                    "listening_habits" && (
-                                                    <BarChart className="h-5 w-5" />
-                                                )}
-                                                {category ===
-                                                    "personality_traits" && (
-                                                    <User className="h-5 w-5" />
-                                                )}
-                                                {category.replace(/_/g, " ")}
-                                            </h3>
-
-                                            {data &&
-                                            typeof data === "object" ? (
-                                                <div className="space-y-2">
-                                                    {Object.entries(data).map(
-                                                        ([key, value]) => (
-                                                            <div
-                                                                key={key}
-                                                                className="grid grid-cols-2 gap-2 p-2 rounded-md bg-muted/50"
-                                                            >
-                                                                <span className="text-sm capitalize">
-                                                                    {key.replace(
-                                                                        /_/g,
-                                                                        " "
-                                                                    )}
-                                                                </span>
-                                                                <span className="text-sm font-medium">
-                                                                    {String(
-                                                                        value
-                                                                    )}
-                                                                </span>
-                                                            </div>
-                                                        )
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm">
-                                                    {String(data)}
-                                                </p>
-                                            )}
+                                            .mood_distribution
+                                    ).map(([mood, value]) => (
+                                        <div key={mood} className="space-y-1">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="capitalize">
+                                                    {mood}
+                                                </span>
+                                                <span>
+                                                    {value !== undefined
+                                                        ? `${value}%`
+                                                        : "N/A"}
+                                                </span>
+                                            </div>
+                                            <Progress
+                                                value={
+                                                    value !== undefined
+                                                        ? value
+                                                        : 0
+                                                }
+                                                className="h-2"
+                                            />
                                         </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    ))}
-                </Tabs>
-            ) : (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>No Analysis Yet</CardTitle>
-                        <CardDescription>
-                            Run your first analysis to discover your music
-                            personality
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col items-center justify-center py-6">
-                        <User className="h-16 w-16 text-muted-foreground mb-4" />
-                        <p className="text-center text-muted-foreground mb-4">
-                            We'll analyze your Spotify listening history to
-                            create a personalized music personality profile.
-                        </p>
-                    </CardContent>
-                    <CardFooter className="flex justify-center">
-                        <Button onClick={handleAnalyze} disabled={isAnalyzing}>
-                            {isAnalyzing ? "Analyzing..." : "Run Analysis"}
+                                    ))
+                                ) : (
+                                    <p className="text-zinc-400">
+                                        No mood distribution data available
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card className="bg-zinc-900/60 border-zinc-800">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Music className="h-5 w-5 text-spotify-green" />
+                                    Audio Features
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {analysis.music_analytics?.audio_features ? (
+                                    <>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-sm">
+                                                <span>Energy Level</span>
+                                                <span className="capitalize">
+                                                    {analysis.music_analytics
+                                                        .audio_features
+                                                        .energy_level || "N/A"}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {Object.entries(
+                                            analysis.music_analytics
+                                                .audio_features
+                                        )
+                                            .filter(
+                                                ([key]) =>
+                                                    key !== "energy_level"
+                                            )
+                                            .map(([feature, value]) => (
+                                                <div
+                                                    key={feature}
+                                                    className="space-y-1"
+                                                >
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="capitalize">
+                                                            {feature}
+                                                        </span>
+                                                        <span>
+                                                            {value !== undefined
+                                                                ? `${value}/10`
+                                                                : "N/A"}
+                                                        </span>
+                                                    </div>
+                                                    <Progress
+                                                        value={
+                                                            value !== undefined
+                                                                ? Number(
+                                                                      value
+                                                                  ) * 10
+                                                                : 0
+                                                        }
+                                                        className="h-2"
+                                                    />
+                                                </div>
+                                            ))}
+                                    </>
+                                ) : (
+                                    <p className="text-zinc-400">
+                                        No audio features available
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <Card className="bg-zinc-900/60 border-zinc-800">
+                            <CardHeader>
+                                <CardTitle>Top Genres</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {analysis.music_analytics?.top_genres
+                                    ?.length ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {analysis.music_analytics.top_genres.map(
+                                            (genre, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="bg-zinc-800 text-zinc-200 px-3 py-1 rounded-full text-sm"
+                                                >
+                                                    {genre}
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-zinc-400">
+                                        No genres available
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card className="bg-zinc-900/60 border-zinc-800">
+                            <CardHeader>
+                                <CardTitle>Psychological Insights</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <ul className="space-y-2">
+                                    {analysis.insights?.length ? (
+                                        analysis.insights.map(
+                                            (insight, index) => (
+                                                <li
+                                                    key={index}
+                                                    className="flex items-start gap-2"
+                                                >
+                                                    <span className="text-spotify-green">
+                                                        •
+                                                    </span>
+                                                    <span className="text-zinc-300">
+                                                        {insight}
+                                                    </span>
+                                                </li>
+                                            )
+                                        )
+                                    ) : (
+                                        <li className="text-zinc-400">
+                                            No insights available
+                                        </li>
+                                    )}
+                                </ul>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-2 mt-6">
+                        <Card className="bg-zinc-900/60 border-zinc-800">
+                            <CardHeader>
+                                <CardTitle>Similar Artists</CardTitle>
+                                <CardDescription>
+                                    Artists you might enjoy based on your taste
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {analysis.recommendations?.similar_artists
+                                    ?.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {analysis.recommendations.similar_artists.map(
+                                            (artist, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="bg-zinc-800 text-zinc-200 px-3 py-1 rounded-full text-sm"
+                                                >
+                                                    {artist}
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-zinc-400 italic">
+                                        No similar artist recommendations
+                                        available
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card className="bg-zinc-900/60 border-zinc-800">
+                            <CardHeader>
+                                <CardTitle>Growth Opportunities</CardTitle>
+                                <CardDescription>
+                                    Expand your musical horizons
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {analysis.recommendations?.growth_opportunities
+                                    ?.length > 0 ? (
+                                    <ul className="space-y-2">
+                                        {analysis.recommendations.growth_opportunities.map(
+                                            (opportunity, index) => (
+                                                <li
+                                                    key={index}
+                                                    className="flex items-start gap-2"
+                                                >
+                                                    <span className="text-spotify-green">
+                                                        •
+                                                    </span>
+                                                    <span className="text-zinc-300">
+                                                        {opportunity}
+                                                    </span>
+                                                </li>
+                                            )
+                                        )}
+                                    </ul>
+                                ) : (
+                                    <p className="text-zinc-400 italic">
+                                        No growth opportunities available
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <div className="flex justify-between">
+                        <Button
+                            onClick={generateAnalysis}
+                            disabled={isAnalyzing}
+                        >
+                            {isAnalyzing ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Analyzing...
+                                </>
+                            ) : (
+                                "Reanalyze"
+                            )}
                         </Button>
-                    </CardFooter>
-                </Card>
+                        <Button asChild>
+                            <Link to="/generate">Generate Playlist</Link>
+                        </Button>
+                    </div>
+                </div>
+            ) : (
+                <div className="text-center py-12">
+                    <BarChart2 className="h-16 w-16 text-zinc-600 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold mb-2">No Analysis Yet</h2>
+                    <p className="text-zinc-400 mb-6 max-w-md mx-auto">
+                        Generate your first music personality analysis to
+                        discover insights about your listening habits.
+                    </p>
+                    <Button
+                        onClick={generateAnalysis}
+                        disabled={isAnalyzing}
+                        size="lg"
+                    >
+                        {isAnalyzing ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Analyzing Your Music...
+                            </>
+                        ) : (
+                            "Generate Analysis"
+                        )}
+                    </Button>
+                </div>
             )}
         </div>
     );
