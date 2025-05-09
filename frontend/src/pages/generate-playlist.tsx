@@ -46,7 +46,7 @@ export default function PlaylistGeneratorPage() {
 
         try {
             setIsGenerating(true);
-            const response = await apiService.generatePlaylist(
+            await apiService.generatePlaylist(
                 user.id,
                 selectedMood || undefined,
                 customPrompt.trim() || undefined
