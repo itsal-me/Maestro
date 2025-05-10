@@ -75,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const tokenExpires = new Date(parsedUser.token_expires);
                 if (tokenExpires < new Date()) {
                     // await refreshToken();
+                    logout();
                     window.location.href = "/login";
                 }
             } catch (error) {
