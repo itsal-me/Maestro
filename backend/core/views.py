@@ -10,7 +10,6 @@ from .serializers import UserAnalysisSerializer, GeneratedPlaylistSerializer
 from datetime import timedelta
 from django.utils import timezone
 import json
-from django.http import JsonResponse as JSONRESPONSE
 from .utils import parse_and_normalize_ai_json
 
 class SpotifyAuthView(APIView):
