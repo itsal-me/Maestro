@@ -13,7 +13,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/hooks/use-auth";
 import { apiService } from "@/lib/api";
 import { BarChart2, Music, Loader2 } from "lucide-react";
 

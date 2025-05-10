@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/hooks/use-auth";
 import { apiService } from "@/lib/api";
 import { Music, Calendar, ExternalLink } from "lucide-react";
 

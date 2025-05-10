@@ -13,13 +13,12 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/hooks/use-auth";
 import { apiService } from "@/lib/api";
 import { Music, BarChart2, ListMusic, ExternalLink } from "lucide-react";
 
 export default function DashboardPage() {
-    const { user } = useAuth();
-    const { spotifyData } = useAuth();
+    const { user, spotifyData, isLoading: authLoading } = useAuth();
 
     const [isLoading, setIsLoading] = useState(true);
     const [analyses, setAnalyses] = useState<
@@ -59,8 +58,10 @@ export default function DashboardPage() {
             }
         };
 
-        fetchData();
-    }, [user, toast]);
+        if (!authLoading && user) {
+            fetchData();
+        }
+    }, [authLoading, user]);
 
     return (
         <div className="container mx-auto px-4 py-8">
@@ -71,7 +72,7 @@ export default function DashboardPage() {
                 </p>
             </header>
 
-            {isLoading ? (
+            {isLoading || authLoading ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {[1, 2, 3].map((i) => (
                         <Card
@@ -293,6 +294,10 @@ export default function DashboardPage() {
                                 <div className="divide-y divide-zinc-800">
                                     {spotifyData.top_tracks.items
                                         .slice(0, 5)
+                                        // .sort(
+                                        //     (a, b) =>
+                                        //         b.popularity - a.popularity
+                                        // )
                                         .map((track, index) => (
                                             <a
                                                 key={track.id}

@@ -3,7 +3,7 @@
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "@/components/sidebar";
 import MobileNav from "@/components/mobile-nav";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Layout() {
     const { isAuthenticated } = useAuth();

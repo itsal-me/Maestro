@@ -2,7 +2,7 @@ import axios from "axios"
 
 // Create an axios instance with base URL
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
+  baseURL: import.meta.env.VITE_API_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -46,7 +46,7 @@ api.interceptors.response.use(
 
           // Call the refresh token endpoint
           const response = await axios.post(
-            `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/auth/spotify/refresh-token/`,
+            `${import.meta.env.VITE_API_URL}/auth/spotify/refresh-token/`,
             { refresh_token: user.refresh_token },
           )
 

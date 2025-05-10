@@ -3,7 +3,7 @@
 import type React from "react";
 
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {

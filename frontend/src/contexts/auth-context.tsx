@@ -1,12 +1,6 @@
 "use client";
 
-import {
-    createContext,
-    useContext,
-    useState,
-    useEffect,
-    type ReactNode,
-} from "react";
+import { createContext, useState, useEffect, type ReactNode } from "react";
 import { toast } from "sonner";
 import { api, apiService } from "@/lib/api";
 
@@ -34,55 +28,61 @@ interface AuthContextType {
     user: User | null;
     spotifyData: SpotifyData | null;
     isLoading: boolean;
+    // setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
     isAuthenticated: boolean;
+    // setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
     login: () => void;
     logout: () => void;
     refreshToken: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+    undefined
+);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [spotifyData, setSpotifyData] = useState<SpotifyData | null>(null);
+
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             const storedUser = localStorage.getItem("maestro_user");
-            if (storedUser) {
-                try {
-                    const parsedUser = JSON.parse(storedUser);
-                    setUser(parsedUser);
+            if (!storedUser) return setIsLoading(false);
 
-                    // Fetch user profile data
-                    if (parsedUser) {
-                        const profileResponse = await apiService.getUserProfile(
-                            parsedUser.id
-                        );
-                        setSpotifyData({
-                            display_name: profileResponse.data.display_name,
-                            email: profileResponse.data.email,
-                            followers: profileResponse.data.followers,
-                            images: profileResponse.data.images,
-                            top_tracks: profileResponse.data.top_tracks,
-                            top_artists: profileResponse.data.top_artists,
-                            recently_played:
-                                profileResponse.data.recently_played,
-                        });
-                    }
+            try {
+                const parsedUser = JSON.parse(storedUser);
+                setUser(parsedUser);
 
-                    // Check if token is expired
-                    const tokenExpires = new Date(parsedUser.token_expires);
-                    if (tokenExpires < new Date()) {
-                        await refreshToken();
-                    }
-                } catch (error) {
-                    console.error("Failed to parse stored user:", error);
-                    localStorage.removeItem("maestro_user");
+                // Fetch user profile data
+                if (parsedUser?.id) {
+                    const profileResponse = await apiService.getUserProfile(
+                        parsedUser.id
+                    );
+                    setSpotifyData({
+                        display_name: profileResponse.data.display_name,
+                        email: profileResponse.data.email,
+                        followers: profileResponse.data.followers,
+                        images: profileResponse.data.images,
+                        top_tracks: profileResponse.data.top_tracks,
+                        top_artists: profileResponse.data.top_artists,
+                        recently_played: profileResponse.data.recently_played,
+                    });
                 }
+
+                // Check if token is expired
+                const tokenExpires = new Date(parsedUser.token_expires);
+                if (tokenExpires < new Date()) {
+                    // await refreshToken();
+                    window.location.href = "/login";
+                }
+            } catch (error) {
+                console.error("Failed to parse stored user:", error);
+                localStorage.removeItem("maestro_user");
+            } finally {
+                setIsLoading(false);
             }
-            setIsLoading(false);
         };
 
         fetchData();
@@ -103,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const logout = () => {
         setUser(null);
         localStorage.removeItem("maestro_user");
+
         toast("You have been successfully logged out.");
     };
 
@@ -145,7 +146,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 user,
                 spotifyData,
                 isLoading,
+                // setIsLoading,
                 isAuthenticated: !!user,
+                // setIsAuthenticated,
                 login,
                 logout,
                 refreshToken,
@@ -155,11 +158,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         </AuthContext.Provider>
     );
 }
-
-export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (context === undefined) {
-        throw new Error("useAuth must be used within an AuthProvider");
-    }
-    return context;
-};

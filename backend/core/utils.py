@@ -46,3 +46,49 @@ def format_spotify_data_for_ai(data):
     }
     
     return json.dumps(formatted, indent=2)
+
+
+
+def normalize_ai_keys(data: dict) -> dict:
+    # Flat key replacements at any level
+    key_mapping = {
+        "insight": "insights",
+        "recommendation": "recommendations",
+        "analytic": "analytics",
+        "similar_artist": "similar_artists",
+        "growth_opportunity": "growth_opportunities",
+    }
+
+    if not isinstance(data, dict):
+        return data
+
+    normalized = {}
+    for key, value in data.items():
+        new_key = key_mapping.get(key, key)
+
+        # Recursively normalize if value is dict or list of dicts
+        if isinstance(value, dict):
+            normalized[new_key] = normalize_ai_keys(value)
+        elif isinstance(value, list):
+            normalized[new_key] = [
+                normalize_ai_keys(item) if isinstance(item, dict) else item for item in value
+            ]
+        else:
+            normalized[new_key] = value
+
+    return normalized
+
+
+def clean_ai_json_response(raw_response: str) -> str:
+    import re
+    return re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_response.strip(), flags=re.IGNORECASE)
+
+def parse_and_normalize_ai_json(raw_response: str) -> dict:
+    cleaned = clean_ai_json_response(raw_response)
+
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Could not parse AI JSON: {e}")
+
+    return normalize_ai_keys(data)

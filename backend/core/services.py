@@ -5,7 +5,10 @@ from django.utils import timezone
 from datetime import timedelta
 import json
 from django.conf import settings
-from .utils import format_spotify_data_for_ai
+from .utils import format_spotify_data_for_ai, normalize_ai_keys
+import re
+
+
 
 class SpotifyService:
     @staticmethod
@@ -69,8 +72,8 @@ class SpotifyService:
         sp = spotipy.Spotify(auth=access_token)
 
         user = sp.current_user()
-        top_tracks = sp.current_user_top_tracks(limit=50, time_range='medium_term')
-        top_artists = sp.current_user_top_artists(limit=50, time_range='medium_term')
+        top_tracks = sp.current_user_top_tracks(limit=50, time_range='short_term')
+        top_artists = sp.current_user_top_artists(limit=50, time_range='short_term')
         recently_played = sp.current_user_recently_played(limit=50)
         saved_tracks = sp.current_user_saved_tracks(limit=50)
 
@@ -165,7 +168,6 @@ You are a music psychologist analyzing a user's Spotify data to provide insights
 
 IMPORTANT:
 - Respond with ONLY the JSON object
-- Ensure the KEY values are EXACTLY SAME as provided
 - Do not include any explanatory text
 - Ensure all brackets and quotes are properly closed
 - Maintain consistent formatting
@@ -188,9 +190,10 @@ IMPORTANT:
         response = requests.post(settings.OPENROUTER_API_URL, headers=headers, json=payload)
         response.raise_for_status()
 
-        # print("AI Response:", response.json()['choices'][0]['message']['content'])  # Debugging line
-        
+        print("AI Response:", response.json()['choices'][0]['message']['content'])
+
         return response.json()['choices'][0]['message']['content']
+        
 
     @staticmethod
     def generate_playlist(data, mood=None, additional_prompt=""):

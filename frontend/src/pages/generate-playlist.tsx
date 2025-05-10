@@ -7,9 +7,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/hooks/use-auth";
 import { apiService } from "@/lib/api";
-import { Music, Loader2 } from "lucide-react";
+import { Music, Loader2, AlertTriangleIcon } from "lucide-react";
 
 const moodOptions = [
     "Happy",
@@ -65,6 +65,13 @@ export default function PlaylistGeneratorPage() {
 
     return (
         <div className="container mx-auto px-4 py-8">
+            <div className="mb-6 flex justify-center items-center">
+                <div className="bg-zinc-900/60 text-white text-sm font-medium px-4 py-3 rounded-lg text-center flex gap-1">
+                    <AlertTriangleIcon />
+                    This service is temporarily unavailable
+                </div>
+            </div>
+
             <header className="mb-8">
                 <h1 className="text-3xl font-bold">Generate Playlist</h1>
                 <p className="text-muted-foreground">

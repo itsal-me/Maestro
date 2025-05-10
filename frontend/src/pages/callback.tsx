@@ -10,6 +10,7 @@ import { Music, Loader2, CheckCircle, XCircle } from "lucide-react";
 export default function CallbackPage() {
     const navigate = useNavigate();
     const location = useLocation();
+
     const [error, setError] = useState<string | null>(null);
     const [stage, setStage] = useState<
         | "connecting"
@@ -57,9 +58,8 @@ export default function CallbackPage() {
 
                 toast("Welcome to Maestro!");
 
-                // Redirect to dashboard after a short delay to show success state
                 setTimeout(() => {
-                    navigate("/dashboard");
+                    window.location.href = "/dashboard";
                 }, 1000);
             } catch (error) {
                 console.error("Callback error:", error);
@@ -84,7 +84,7 @@ export default function CallbackPage() {
         };
 
         processCallback();
-    }, [location, navigate, toast]);
+    }, [location, navigate]);
 
     const stageMessages = {
         connecting: "Establishing connection to Spotify...",

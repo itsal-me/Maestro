@@ -119,6 +119,10 @@
     .bg-spotify-black {
         background-color: #191414;
     }
+
+    .text-spotify-green {
+        color: #1db954;
+    }
 }
 
 @layer base {

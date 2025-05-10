@@ -1,26 +1,29 @@
 "use client";
 
 import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+    useNavigate,
+    // useSearchParams
+} from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/hooks/use-auth";
 
 import { Music, Sparkles, BarChart2, ListMusic } from "lucide-react";
 
 export default function HomePage() {
     const { isAuthenticated, login } = useAuth();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    // const [searchParams] = useSearchParams();
 
-    // Handle Spotify callback
-    useEffect(() => {
-        const code = searchParams.get("code");
-        if (code) {
-            // Redirect to the callback page with the code
-            navigate(`/callback?code=${code}`);
-        }
-    }, [searchParams, navigate]);
+    // // Handle Spotify callback
+    // useEffect(() => {
+    //     const code = searchParams.get("code");
+    //     if (code) {
+    //         // Redirect to the callback page with the code
+    //         navigate(`/callback?code=${code}`);
+    //     }
+    // }, [searchParams, navigate]);
 
     // Redirect if already authenticated
     useEffect(() => {

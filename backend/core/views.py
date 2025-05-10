@@ -11,6 +11,7 @@ from datetime import timedelta
 from django.utils import timezone
 import json
 from django.http import JsonResponse as JSONRESPONSE
+from .utils import parse_and_normalize_ai_json
 
 class SpotifyAuthView(APIView):
     def get(self, request):
@@ -125,6 +126,7 @@ class UserProfileView(APIView):
                 'recently_played': sp_data['recently_played'],
                 'saved_tracks': sp_data['saved_tracks']
             }
+
             return Response(user_data)
         except UserProfile.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -139,34 +141,41 @@ class AnalyzeUserView(APIView):
             return Response({'error': 'User ID not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            # Get user profile
             user = UserProfile.objects.get(id=user_id)
-            sp_data = SpotifyService.get_user_data(user_profile=user)
 
-            # Get AI analysis
-            ai_response = AIService.analyze_music_data(sp_data)
-            analysis_data = json.loads(ai_response)
+            # Collect Spotify data for the user
+            spotify_data = SpotifyService.get_user_data(user_profile=user)
 
-            
+            # Get and normalize AI response
+            ai_response = AIService.analyze_music_data(spotify_data)
+            parsed_data = parse_and_normalize_ai_json(ai_response)
 
-            # Save analysis to database
-            analysis = UserAnalysis.objects.create(
+            print("parsed data:", parsed_data)
+
+            generated_analyis = UserAnalysis.objects.create(
                 user=user,
-                personality_type=analysis_data.get('personality_type', ''),
-                description=analysis_data.get('description', ''),
-                music_analytics=analysis_data.get('analytics', {}),
-                insights=analysis_data.get('insights', []),
-                recommendations=analysis_data.get('recommendations', {})
+                personality_type = parsed_data['personality_type'],
+                description = parsed_data['description'],
+                music_analytics = parsed_data['analytics'],
+                insights = parsed_data['insights'],
+                recommendations = parsed_data['recommendations']
             )
 
-            serializer = UserAnalysisSerializer(analysis)
-            
+            # Prepare serializer and validate
+            serializer = UserAnalysisSerializer(generated_analyis)
             return Response(serializer.data)
-        
 
         except UserProfile.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        except ValueError as ve:
+            return Response({'error': f'Parsing error: {ve}'}, status=status.HTTP_400_BAD_REQUEST)
+
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': f'Unexpected server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 class GeneratePlaylistView(APIView):
     def post(self, request):
